@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Regex → Finite Automata Visualizer</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">λ</div>
+      <div>
+        <h1>Regex → Finite Automata</h1>
+        <p class="tag">Thompson · Subset Construction · DFA Minimization</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="theme-help" class="ghost-btn" title="Show syntax help">?</button>
+    </div>
+  </header>
+
+  <section class="input-section card">
+    <div class="input-row">
+      <label class="input-label">Regular Expression</label>
+      <div class="input-controls">
+        <select id="examples" class="select">
+          <option value="">Load example…</option>
+          <option value="(a|b)*abb">(a|b)*abb</option>
+          <option value="a(b|c)*">a(b|c)*</option>
+          <option value="(0|1)*1(0|1)(0|1)">binary, 3rd-from-last is 1</option>
+          <option value="a*b*">a*b*</option>
+          <option value="(ab|ba)*">(ab|ba)*</option>
+          <option value="a?b+c*">a?b+c*</option>
+          <option value="(a|b)*">(a|b)*</option>
+          <option value="ab|cd">ab|cd</option>
+        </select>
+      </div>
+    </div>
+    <div class="regex-row">
+      <input id="regex-input" type="text" spellcheck="false"
+             placeholder="e.g.  (a|b)*abb" value="(a|b)*abb" />
+      <button id="convert-btn" class="primary-btn">Convert <span class="arrow">→</span></button>
+    </div>
+    <div id="error-box" class="error-box hidden"></div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="parse">
+      <span class="tab-num">1</span>
+      <span class="tab-label">Parse Tree</span>
+    </button>
+    <button class="tab" data-tab="nfa">
+      <span class="tab-num">2</span>
+      <span class="tab-label">NFA <span class="tab-sub">Thompson</span></span>
+    </button>
+    <button class="tab" data-tab="dfa">
+      <span class="tab-num">3</span>
+      <span class="tab-label">DFA <span class="tab-sub">Subset</span></span>
+    </button>
+    <button class="tab" data-tab="min">
+      <span class="tab-num">4</span>
+      <span class="tab-label">Minimal DFA</span>
+    </button>
+    <button class="tab" data-tab="sim">
+      <span class="tab-num">5</span>
+      <span class="tab-label">Simulate</span>
+    </button>
+  </nav>
+
+  <section class="content">
+    <div class="viz-pane card">
+      <div class="viz-header">
+        <h2 id="viz-title">Parse Tree</h2>
+        <div class="viz-controls" id="viz-controls">
+          <button id="step-prev" class="ctrl-btn" title="Previous step">◀</button>
+          <button id="step-play" class="ctrl-btn" title="Play / Pause">▶</button>
+          <button id="step-next" class="ctrl-btn" title="Next step">▶▶</button>
+          <button id="step-reset" class="ctrl-btn ghost-btn" title="Reset">↺</button>
+          <span class="step-counter" id="step-counter">— / —</span>
+          <label class="speed-label">
+            Speed
+            <input id="speed-slider" type="range" min="200" max="2000" value="800" step="100" />
+          </label>
+        </div>
+      </div>
+      <div class="viz-stage" id="viz-stage">
+        <svg id="main-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+
+    <aside class="info-pane card">
+      <div class="info-header">
+        <h3 id="info-title">Step Description</h3>
+      </div>
+      <div class="info-body" id="info-body">
+        <p class="muted">Enter a regular expression and click <b>Convert</b> to begin.</p>
+      </div>
+
+      <div class="sim-panel hidden" id="sim-panel">
+        <h4>Test a string</h4>
+        <div class="sim-input-row">
+          <input id="sim-input" placeholder="Enter input string" spellcheck="false" />
+          <button id="sim-run" class="primary-btn small">Run</button>
+        </div>
+        <div class="sim-tape" id="sim-tape"></div>
+        <div class="sim-status" id="sim-status"></div>
+      </div>
+
+      <div class="legend">
+        <span><span class="dot start"></span>Start</span>
+        <span><span class="dot accept"></span>Accept</span>
+        <span><span class="dot active"></span>Active</span>
+        <span><span class="dot eps"></span>ε-edge</span>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ===== Regex Equivalence Checker ===== -->
+  <section class="eq-section card">
+    <div class="eq-top-row">
+      <label class="input-label">Regex Equivalence Checker</label>
+      <span class="muted eq-desc">
+        Converts both regex to minimized DFAs and checks for structural isomorphism.
+        Shows a counterexample string if they differ.
+      </span>
+    </div>
+
+    <div class="eq-inputs-row">
+      <div class="eq-field">
+        <input id="eq-r1" class="eq-input" type="text" spellcheck="false"
+               placeholder="Regex 1 — e.g. (a|b)*abb" />
+      </div>
+      <span class="eq-separator">≡?</span>
+      <div class="eq-field">
+        <input id="eq-r2" class="eq-input" type="text" spellcheck="false"
+               placeholder="Regex 2 — e.g. b*(ab*ab*)*" />
+      </div>
+      <button id="eq-btn" class="primary-btn">Check <span class="arrow">→</span></button>
+    </div>
+
+    <div id="eq-result" class="hidden"></div>
+
+    <div id="eq-dfas" class="eq-dfas hidden">
+      <div class="eq-dfa-panel">
+        <div class="eq-panel-title" id="eq-title-1">Minimal DFA — Regex 1</div>
+        <div class="eq-svg-stage">
+          <svg id="eq-svg-1" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+      <div class="eq-dfa-panel">
+        <div class="eq-panel-title" id="eq-title-2">Minimal DFA — Regex 2</div>
+        <div class="eq-svg-stage">
+          <svg id="eq-svg-2" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Built for educational use · open source · runs entirely in your browser</span>
+  </footer>
+</div>
+
+<div id="help-modal" class="modal hidden">
+  <div class="modal-card">
+    <h3>Regex Syntax</h3>
+    <ul class="syntax-list">
+      <li><code>a</code>, <code>b</code>, <code>0</code>… — single literal symbol</li>
+      <li><code>RS</code> — concatenation (R then S)</li>
+      <li><code>R|S</code> — alternation (R or S)</li>
+      <li><code>R*</code> — zero or more R (Kleene star)</li>
+      <li><code>R+</code> — one or more R</li>
+      <li><code>R?</code> — zero or one R</li>
+      <li><code>(R)</code> — grouping</li>
+    </ul>
+    <p class="muted">Whitespace is ignored. Symbols may be any printable character except the operators above.</p>
+    <button id="help-close" class="primary-btn small">Close</button>
+  </div>
+</div>
+
+<script src="js/parser.js"></script>
+<script src="js/thompson.js"></script>
+<script src="js/subset.js"></script>
+<script src="js/minimize.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/visualizer.js"></script>
+<script src="js/simulator.js"></script>
+<script src="js/animator.js"></script>
+<script src="js/equivalence.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
